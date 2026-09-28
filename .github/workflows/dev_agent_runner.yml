@@ -1,12 +1,24 @@
 name: Autonomous Dev Agent
 
 on:
+  # Trigger 1: When you drag a card on your GitHub Project board
+  projects_v2_item:
+    types: [edited]
+
+  # Trigger 2: Manual fallback via label on the issue
   issues:
     types: [labeled]
 
 jobs:
   execute-task:
-    if: github.event.label.name == 'ready-for-dev'
+    # Runs IF:
+    # A) The card was moved to "Ready for Dev" in your Project Board, OR
+    # B) The label 'ready-for-dev' was added directly to the issue
+    if: >-
+      (github.event_name == 'projects_v2_item' &&
+       github.event.changes.field_value.field_name == 'Status' &&
+       github.event.projects_v2_item.field_values.status == 'Ready for Dev') ||
+      (github.event_name == 'issues' && github.event.label.name == 'ready-for-dev')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -30,51 +42,76 @@ jobs:
           git config --global user.name "Gemini Dev Agent"
           git config --global user.email "agent@github-actions.internal"
 
+      - name: Resolve Issue Data
+        id: resolve_issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "ISSUE_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+            echo "ISSUE_TITLE=${{ github.event.issue.title }}" >> $GITHUB_ENV
+            echo "ISSUE_BODY<<EOF" >> $GITHUB_ENV
+            echo "${{ github.event.issue.body }}" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          else
+            # For Project Board moves, fetch the linked issue via GitHub CLI
+            ITEM_ID="${{ github.event.projects_v2_item.content_node_id }}"
+            gh api graphql -f query='
+              query($node: ID!) {
+                node(id: $node) {
+                  ... on Issue {
+                    number
+                    title
+                    body
+                  }
+                }
+              }
+            ' -f node="$ITEM_ID" > item.json
+            
+            echo "ISSUE_NUMBER=$(jq -r .data.node.number item.json)" >> $GITHUB_ENV
+            echo "ISSUE_TITLE=$(jq -r .data.node.title item.json)" >> $GITHUB_ENV
+            echo "ISSUE_BODY<<EOF" >> $GITHUB_ENV
+            jq -r .data.node.body item.json >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+          fi
+
       - name: Run Dev Agent & Diff Guard
         id: agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
         run: |
           python .github/scripts/dev_agent.py
         continue-on-error: true
 
-      # Handle Circuit Breaker Trigger
       - name: Handle Circuit Breaker Alert
         if: steps.agent.outcome == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUM: ${{ github.event.issue.number }}
         run: |
           if [ -f alert_comment.md ]; then
-            gh issue comment $ISSUE_NUM --body-file alert_comment.md
+            gh issue comment $ISSUE_NUMBER --body-file alert_comment.md
           else
-            gh issue comment $ISSUE_NUM --body "❌ Dev Agent encountered an unexpected execution error. Check Action logs."
+            gh issue comment $ISSUE_NUMBER --body "❌ Dev Agent encountered an unexpected execution error. Check Action logs."
           fi
-          gh issue edit $ISSUE_NUM --remove-label "ready-for-dev" --add-label "agent:needs-refinement"
+          gh issue edit $ISSUE_NUMBER --add-label "agent:needs-refinement"
           exit 1
 
-      # Create Pull Request if Successful
       - name: Create Branch & Pull Request
         if: steps.agent.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUM: ${{ github.event.issue.number }}
-          TITLE: ${{ github.event.issue.title }}
         run: |
-          BRANCH_NAME="agent/issue-${ISSUE_NUM}"
+          BRANCH_NAME="agent/issue-${ISSUE_NUMBER}"
           git checkout -b $BRANCH_NAME
           git add .
-          git commit -m "feat: implement issue #${ISSUE_NUM} - ${TITLE}"
+          git commit -m "feat: implement issue #${ISSUE_NUMBER} - ${ISSUE_TITLE}"
           git push origin $BRANCH_NAME
 
           gh pr create \
-            --title "feat: ${TITLE} (Closes #${ISSUE_NUM})" \
-            --body "Automated implementation by Dev Agent for Issue #${ISSUE_NUM}. Includes SwiftUI/SwiftData changes and unit test suite. Please review diff and test in Xcode." \
+            --title "feat: ${ISSUE_TITLE} (Closes #${ISSUE_NUMBER})" \
+            --body "Automated implementation by Dev Agent for Issue #${ISSUE_NUMBER}. Please review diff and test in Xcode." \
             --head $BRANCH_NAME \
             --base main
 
-          gh issue comment $ISSUE_NUM --body "✅ Pull Request created for this ticket with unit tests included. Ready for human review in Xcode."
-          gh issue edit $ISSUE_NUM --remove-label "ready-for-dev" --add-label "agent:pr-open"
+          gh issue comment $ISSUE_NUMBER --body "✅ Pull Request created for this ticket with unit tests included."
+          gh issue edit $ISSUE_NUMBER --add-label "agent:pr-open"
