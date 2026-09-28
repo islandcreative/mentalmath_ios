@@ -1,0 +1,32 @@
+name: Sync Schema to Google Doc
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/Schema_Reference.md'
+  workflow_dispatch: # Allows manual trigger from GitHub UI if needed
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Google API Client
+        run: |
+          pip install google-api-python-client google-auth
+
+      - name: Push to Google Doc
+        env:
+          GCP_SA_KEY: ${{ secrets.GCP_SA_KEY }}
+          SCHEMA_DOC_ID: ${{ secrets.SCHEMA_DOC_ID }}
+        run: |
+          python .github/scripts/sync_to_gdoc.py
