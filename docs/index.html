@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RepoFlow &bull; GitHub Agentic Ops Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"Plus Jakarta Sans"', '"SF Pro Text"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'SFMono-Regular', 'Menlo', 'Monaco', 'monospace'],
+          },
+          colors: {
+            apple: {
+              canvas: '#0d0e12',
+              surface: '#15161d',
+              card: '#1b1d26',
+              cardHover: '#232532',
+              border: 'rgba(255, 255, 255, 0.08)',
+              borderFocus: 'rgba(255, 255, 255, 0.2)',
+              subtext: '#8e90a0',
+              blue: '#0A84FF',
+              blueHover: '#0071E3',
+              purple: '#BF5AF2',
+              emerald: '#30D158',
+              amber: '#FF9F0A',
+              rose: '#FF453A',
+              cyan: '#64D2FF'
+            }
+          },
+          boxShadow: {
+            'apple-card': '0 8px 30px rgba(0, 0, 0, 0.35)'
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.28); }
+    .drag-over { background-color: rgba(10, 132, 255, 0.06) !important; border-color: rgba(10, 132, 255, 0.6) !important; }
+    .dragging { opacity: 0.45; transform: scale(0.98); }
+    .glassmorphic { background: rgba(21, 22, 29, 0.72); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+    .badge-circuit-breaker {
+      background: linear-gradient(135deg, rgba(255, 69, 58, 0.15), rgba(255, 159, 10, 0.15));
+      border: 1px solid rgba(255, 69, 58, 0.3);
+      color: #ff756b;
+    }
+  </style>
+</head>
+<body class="bg-apple-canvas text-gray-200 min-h-screen flex flex-col font-sans selection:bg-apple-blue selection:text-white">
+
+  <!-- TOP APP BAR -->
+  <header class="sticky top-0 z-40 glassmorphic border-b border-apple-border px-4 lg:px-7 py-3">
+    <div class="max-w-[1720px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- Brand & Project Selector -->
+      <div class="flex items-center gap-3.5">
+        <div class="flex items-center gap-1.5 hidden sm:flex mr-1">
+          <div class="w-3 h-3 rounded-full bg-[#ff5f56] border border-[#e0443e]/40"></div>
+          <div class="w-3 h-3 rounded-full bg-[#ffbd2e] border border-[#dea123]/40"></div>
+          <div class="w-3 h-3 rounded-full bg-[#27c93f] border border-[#1aab29]/40"></div>
+        </div>
+
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-blue-500/20">
+            <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-white text-base tracking-tight">RepoFlow</span>
+              <span class="text-[11px] font-mono px-2 py-0.5 rounded-full bg-apple-card border border-apple-border text-apple-subtext" id="repoDisplayBadge">islandcreative/autonomous-agent</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Connection Status Pill -->
+        <div id="connectionStatusPill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-apple-card/80 border border-apple-border text-xs text-apple-subtext">
+          <span class="w-2 h-2 rounded-full bg-amber-400 animate-pulse" id="statusDot"></span>
+          <span id="statusText" class="font-medium text-xs">Demo Mode</span>
+        </div>
+      </div>
+
+      <!-- Center Filter Box -->
+      <div class="flex-1 max-w-md mx-2 hidden md:block">
+        <div class="relative">
+          <svg class="w-4 h-4 text-apple-subtext absolute left-3 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <input type="text" id="filterInput" placeholder="Filter tickets by title, label, or #ID..." 
+                 class="w-full bg-apple-surface/90 border border-apple-border rounded-xl pl-9 pr-4 py-1.5 text-xs text-gray-200 placeholder-apple-subtext focus:outline-none focus:border-apple-blue/80">
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="flex items-center gap-2.5">
+        <button id="ideaToTicketBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-purple-600 via-indigo-600 to-apple-blue text-white text-xs font-semibold hover:brightness-110 active:scale-95 transition shadow-sm shadow-indigo-500/25">
+          <svg class="w-3.5 h-3.5 text-amber-300" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L14.4 7.6L20 10L14.4 12.4L12 18L9.6 12.4L4 10L9.6 7.6L12 2Z"/>
+          </svg>
+          <span>Idea-to-Ticket</span>
+          <span class="text-[10px] bg-white/20 px-1 py-0.2 rounded font-mono">Gemini Gem ↗</span>
+        </button>
+
+        <button id="openNewTicketModalBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-apple-card border border-apple-border text-gray-200 text-xs font-medium hover:bg-apple-cardHover active:scale-95 transition">
+          <svg class="w-3.5 h-3.5 text-apple-emerald" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+          </svg>
+          <span>New Ticket</span>
+        </button>
+
+        <button id="syncRepoBtn" title="Sync repository with GitHub" class="p-2 rounded-xl bg-apple-card border border-apple-border text-apple-subtext hover:text-white hover:bg-apple-cardHover transition">
+          <svg id="syncIcon" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+          </svg>
+        </button>
+
+        <button id="openSettingsModalBtn" title="Configure GitHub Token & Repository" class="p-2 rounded-xl bg-apple-card border border-apple-border text-apple-subtext hover:text-white hover:bg-apple-cardHover transition">
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+          </svg>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-[1720px] w-full mx-auto px-4 lg:px-7 py-5 flex flex-col gap-6">
+
+    <!-- DEMO / SETUP BANNER -->
+    <div id="demoBanner" class="rounded-2xl border border-apple-border bg-apple-surface/60 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-apple-card">
+      <div class="flex items-center gap-3">
+        <div class="p-2 rounded-xl bg-apple-blue/10 border border-apple-blue/20 text-apple-blue shrink-0">
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-sm font-semibold text-white">Interactive GitHub Dashboard Active</h2>
+          <p class="text-xs text-apple-subtext mt-0.5">Currently displaying representative operational data. Add your GitHub Personal Access Token in Settings to stream live issues and PRs.</p>
+        </div>
+      </div>
+      <div class="flex items-center gap-2 self-end sm:self-auto">
+        <button id="quickConnectBtn" class="px-3 py-1.5 rounded-xl bg-apple-blue hover:bg-apple-blueHover text-white text-xs font-medium transition shadow-sm shadow-blue-500/20">
+          Connect Real Repo
+        </button>
+        <button id="dismissBannerBtn" class="p-1.5 text-apple-subtext hover:text-white rounded-lg hover:bg-white/5 transition">
+          <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- STATS BAR -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      
+      <!-- Total Tickets -->
+      <div class="relative overflow-hidden rounded-2xl border border-apple-border bg-apple-surface/80 p-4 shadow-apple-card">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wider text-apple-subtext">Total Tickets</span>
+          <span class="p-1.5 rounded-lg bg-blue-500/10 text-apple-blue">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+            </svg>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="statTotalTickets" class="text-2xl lg:text-3xl font-bold tracking-tight text-white">0</span>
+          <span class="text-xs text-apple-emerald font-medium">100% active</span>
+        </div>
+        <div class="mt-2 text-[11px] text-apple-subtext">Issues tracked in current repo</div>
+      </div>
+
+      <!-- PRs Awaiting Review -->
+      <div class="relative overflow-hidden rounded-2xl border border-apple-border bg-apple-surface/80 p-4 shadow-apple-card">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wider text-apple-subtext">PRs Awaiting Review</span>
+          <span class="p-1.5 rounded-lg bg-purple-500/10 text-apple-purple">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+            </svg>
+          </span>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="statAwaitingReview" class="text-2xl lg:text-3xl font-bold tracking-tight text-white">0</span>
+          <span class="text-xs text-apple-purple font-medium">Pending review</span>
+        </div>
+        <div class="mt-2 text-[11px] text-apple-subtext">Open PRs requiring dev signoff</div>
+      </div>
+
+      <!-- Circuit Breaker Tripped -->
+      <div class="relative overflow-hidden rounded-2xl border border-apple-border bg-apple-surface/80 p-4 shadow-apple-card">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium uppercase tracking-wider text-apple-subtext">Circuit Breakers</span>
+          <span class="p-1.5 rounded-lg bg-rose-500/10 text-apple-rose">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.50
