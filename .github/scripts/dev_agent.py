@@ -9,27 +9,35 @@ from google.genai import types
 def run_command(cmd):
     result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
     if result.returncode != 0:
-        print(f"Error running command '{cmd}': {result.stderr}")
+        print(f"Command '{cmd}' notice: {result.stderr.strip()}")
     return result.stdout
 
 def main():
     api_key = os.getenv("GEMINI_API_KEY")
-    issue_title = os.getenv("ISSUE_TITLE", "")
-    issue_body = os.getenv("ISSUE_BODY", "")
     issue_number = os.getenv("ISSUE_NUMBER", "")
 
     if not api_key:
-        print("Missing GEMINI_API_KEY")
+        print("Error: Missing GEMINI_API_KEY")
         sys.exit(1)
 
-    # 1. Parse constraints from ticket
+    # 1. Fetch live Issue title and body using GitHub CLI
+    raw_issue = run_command(f"gh issue view {issue_number} --json title,body")
+    try:
+        issue_json = json.loads(raw_issue)
+        issue_title = issue_json.get("title", "")
+        issue_body = issue_json.get("body", "")
+    except Exception as e:
+        print(f"Failed to fetch issue metadata via gh CLI: {e}")
+        sys.exit(1)
+
+    # 2. Determine diff budget from ticket specification
     max_lines = 150
     if "Max Diff Lines: 80" in issue_body or "Small" in issue_body:
         max_lines = 90
     elif "Max Diff Lines: 250" in issue_body or "Medium" in issue_body:
         max_lines = 260
 
-    # Extract target files mentioned in issue
+    # Extract target files mentioned in backticks with .swift
     target_files = re.findall(r"`([a-zA-Z0-9_\-\./]+\.swift)`", issue_body)
     target_files = list(set(target_files))
 
@@ -67,7 +75,7 @@ def main():
     Implement the changes and generate the unit test file.
     """
 
-    # 2. Invoke Gemini 2.5 Flash
+    # 3. Invoke Gemini 2.5 Flash
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=prompt,
@@ -83,9 +91,11 @@ def main():
         files_to_write = data.get("files", [])
     except Exception as e:
         print(f"Failed to parse model response: {e}")
+        with open("alert_comment.md", "w") as f:
+            f.write("⚠️ **Dev Agent Parsing Error**: Model response was not valid JSON.")
         sys.exit(1)
 
-    # 3. Apply changes to workspace
+    # 4. Write files
     for item in files_to_write:
         path = item.get("path")
         content = item.get("content")
@@ -93,11 +103,9 @@ def main():
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
 
-    # 4. Circuit Breaker: Strict Diff Inspection
-    diff_stat = run_command("git diff --stat")
+    # 5. Circuit Breaker: Strict Diff Inspection
     lines_added = 0
     lines_deleted = 0
-    
     numstat = run_command("git diff --numstat")
     for line in numstat.strip().split("\n"):
         if line.strip():
@@ -107,20 +115,19 @@ def main():
                 lines_deleted += int(parts[1]) if parts[1].isdigit() else 0
 
     total_diff = lines_added + lines_deleted
-    print(f"Total diff: {total_diff} lines (Limit: {max_lines})")
+    print(f"Total diff: {total_diff} lines (Budget: {max_lines})")
 
-    # 5. Guard enforcement
     if total_diff > max_lines:
         alert_msg = (
             f"⚠️ **Dev Agent Circuit Breaker Triggered**\n\n"
             f"The generated code changes exceeded the allowed budget.\n"
             f"- **Allowed:** {max_lines} lines\n"
             f"- **Attempted:** {total_diff} lines ({lines_added} added, {lines_deleted} removed)\n\n"
-            f"Run aborted to protect project stability and token budget. Please refine this ticket into smaller tasks."
+            f"Run aborted to protect project stability and token budget. Please break this ticket into smaller tasks."
         )
         with open("alert_comment.md", "w") as f:
             f.write(alert_msg)
-        sys.exit(2) # Return code 2 indicates circuit breaker tripped
+        sys.exit(2)
 
     print("Diff inspection passed successfully.")
 
