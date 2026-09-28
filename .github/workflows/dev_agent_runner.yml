@@ -6,13 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       issue_number:
-        description: 'Issue number to run dev agent on'
+        description: 'Issue number to execute task for'
         required: true
         type: string
 
 jobs:
   execute-task:
-    # Trigger if manually run OR if the label applied is exactly 'Ready for Dev'
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'issues' && github.event.label.name == 'Ready for Dev')
@@ -23,8 +22,10 @@ jobs:
       issues: write
 
     steps:
-      - name: Checkout Code
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Resolve Issue Metadata
         id: metadata
@@ -40,29 +41,31 @@ jobs:
           fi
           echo "ISSUE_NUM=$ISSUE_NUM" >> $GITHUB_OUTPUT
 
-          # Fetch latest issue title and body via GitHub CLI
           ISSUE_DATA=$(gh issue view $ISSUE_NUM --json title,body)
           echo "TITLE=$(echo "$ISSUE_DATA" | jq -r .title)" >> $GITHUB_OUTPUT
 
-      # Transition: Strip old status labels -> In Progress
+      # Transition: Strip prior status -> In Progress
       - name: Transition Issue to In Progress
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUM: ${{ steps.metadata.outputs.ISSUE_NUM }}
         run: |
-          # Remove prior status labels so there is never a conflict
           gh issue edit $ISSUE_NUM --remove-label "Backlog" || true
           gh issue edit $ISSUE_NUM --remove-label "Ready for Dev" || true
           gh issue edit $ISSUE_NUM --remove-label "Needs Refinement" || true
-          # Add current status
           gh issue edit $ISSUE_NUM --add-label "In Progress"
 
-      - name: Install Google GenAI SDK
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
         run: pip install google-genai
 
-      - name: Configure Git
+      - name: Configure Git Identity
         run: |
-          git config --global user.name "Gemini Dev Agent"
+          git config --global user.name "Autonomous Dev Agent"
           git config --global user.email "agent@github-actions.internal"
 
       - name: Run Dev Agent & Diff Guard
@@ -75,7 +78,7 @@ jobs:
           python .github/scripts/dev_agent.py
         continue-on-error: true
 
-      # Transition on Failure / Circuit Breaker: In Progress -> Needs Refinement
+      # Handle Circuit Breaker Trigger
       - name: Handle Circuit Breaker & Alerts
         if: steps.agent.outcome == 'failure'
         env:
@@ -85,12 +88,12 @@ jobs:
           if [ -f alert_comment.md ]; then
             gh issue comment $ISSUE_NUM --body-file alert_comment.md
           else
-            gh issue comment $ISSUE_NUM --body "❌ **Dev Agent Encountered an Error**: The run could not be completed. Check GitHub Action logs for details."
+            gh issue comment $ISSUE_NUM --body "❌ **Dev Agent Error**: Failed to process task. Check GitHub Action run logs."
           fi
           gh issue edit $ISSUE_NUM --remove-label "In Progress" --add-label "Needs Refinement"
           exit 1
 
-      # Transition on Success: In Progress -> PR Open
+      # Handle Success: Branch & PR Creation
       - name: Create Branch & Pull Request
         if: steps.agent.outcome == 'success'
         env:
@@ -106,9 +109,9 @@ jobs:
 
           PR_URL=$(gh pr create \
             --title "feat: ${TITLE} (Closes #${ISSUE_NUM})" \
-            --body "Automated implementation by Dev Agent for Issue #${ISSUE_NUM}. Includes SwiftUI/SwiftData changes and unit test suite. Please review diff and test in Xcode." \
+            --body "Automated implementation by Dev Agent for Issue #${ISSUE_NUM}. Includes SwiftUI/SwiftData code and accompanying unit tests. Ready for human review in Xcode." \
             --head $BRANCH_NAME \
             --base main)
 
-          gh issue comment $ISSUE_NUM --body "✅ **Implementation Complete**: Pull Request created: $PR_URL with unit tests included. Ready for human review in Xcode."
+          gh issue comment $ISSUE_NUM --body "✅ **Implementation Complete**: Pull Request created: $PR_URL with unit tests included."
           gh issue edit $ISSUE_NUM --remove-label "In Progress" --add-label "PR Open"
