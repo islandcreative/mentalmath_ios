@@ -44,18 +44,18 @@ jobs:
           ISSUE_DATA=$(gh issue view $ISSUE_NUM --json title,body)
           echo "TITLE=$(echo "$ISSUE_DATA" | jq -r .title)" >> $GITHUB_OUTPUT
 
-      # Transition: Ready for Dev -> In Progress
+      # Transition: Strip old status labels -> In Progress
       - name: Transition Issue to In Progress
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ISSUE_NUM: ${{ steps.metadata.outputs.ISSUE_NUM }}
         run: |
-          gh issue edit $ISSUE_NUM --remove-label "Ready for Dev" --add-label "In Progress" || true
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
+          # Remove prior status labels so there is never a conflict
+          gh issue edit $ISSUE_NUM --remove-label "Backlog" || true
+          gh issue edit $ISSUE_NUM --remove-label "Ready for Dev" || true
+          gh issue edit $ISSUE_NUM --remove-label "Needs Refinement" || true
+          # Add current status
+          gh issue edit $ISSUE_NUM --add-label "In Progress"
 
       - name: Install Google GenAI SDK
         run: pip install google-genai
