@@ -2,11 +2,19 @@ name: Autonomous Dev Agent
 
 on:
   issues:
-    types: [labeled]
+    types: [labeled, opened]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: 'Issue number to run dev agent on'
+        required: true
+        type: string
 
 jobs:
   execute-task:
-    if: github.event.label.name == 'ready-for-dev'
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'ready-for-dev'))
     runs-on: ubuntu-latest
     permissions:
       contents: write
