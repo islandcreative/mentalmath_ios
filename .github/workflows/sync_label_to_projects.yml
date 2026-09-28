@@ -1,0 +1,66 @@
+name: Sync Issue Status Labels to Project Board
+
+on:
+  issues:
+    types: [opened, labeled]
+
+jobs:
+  sync-to-project:
+    runs-on: ubuntu-latest
+    if: >
+      contains(github.event.issue.labels.*.name, 'Backlog') ||
+      contains(github.event.issue.labels.*.name, 'Ready for Dev') ||
+      contains(github.event.issue.labels.*.name, 'In Progress') ||
+      contains(github.event.issue.labels.*.name, 'PR Open') ||
+      contains(github.event.issue.labels.*.name, 'Needs Refinement') ||
+      contains(github.event.issue.labels.*.name, 'Done')
+    steps:
+      - name: Add Issue to Organization Project
+        uses: actions/add-to-project@v1
+        with:
+          project-url: https://github.com/orgs/<YOUR_ORG>/projects/<PROJECT_NUMBER>
+          github-token: ${{ secrets.PROJECT_SYNC_PAT }}
+
+      - name: Update Project Status Column and Reconcile Labels
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_SYNC_PAT }}
+          ORG: "<YOUR_ORG>"
+          PROJECT_NUM: "<PROJECT_NUMBER>"
+          ISSUE_URL: ${{ github.event.issue.html_url }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          LABELS=$(gh issue view "$ISSUE_NUMBER" --repo "$REPO" --json labels --jq '.labels.[].name')
+          
+          # Priority list: Include Needs Refinement
+          TARGET_STATUS=""
+          for s in "Done" "PR Open" "Needs Refinement" "In Progress" "Ready for Dev" "Backlog"; do
+            if echo "$LABELS" | grep -Fxq "$s"; then
+              TARGET_STATUS="$s"
+              break
+            fi
+          done
+
+          if [ -z "$TARGET_STATUS" ]; then
+            echo "No recognized status label found on issue. Exiting."
+            exit 0
+          fi
+
+          echo "Detected target status: $TARGET_STATUS"
+
+          # Update the Status field on the Project Board
+          gh project item-edit "$PROJECT_NUM" \
+            --owner "$ORG" \
+            --url "$ISSUE_URL" \
+            --field "Status" \
+            --value "$TARGET_STATUS"
+
+          # Strip other 5 status labels to maintain exclusivity
+          for s in "Backlog" "Ready for Dev" "In Progress" "PR Open" "Needs Refinement" "Done"; do
+            if [ "$s" != "$TARGET_STATUS" ] && echo "$LABELS" | grep -Fxq "$s"; then
+              echo "Removing old status label: $s"
+              gh issue edit "$ISSUE_NUMBER" --repo "$REPO" --remove-label "$s"
+            fi
+          done
+
+          echo "Issue #$ISSUE_NUMBER and Project Board are now in sync with status: $TARGET_STATUS"
