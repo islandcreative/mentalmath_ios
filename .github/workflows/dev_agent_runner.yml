@@ -2,7 +2,7 @@ name: Autonomous Dev Agent
 
 on:
   issues:
-    types: [labeled, opened]
+    types: [labeled]
   workflow_dispatch:
     inputs:
       issue_number:
@@ -12,9 +12,10 @@ on:
 
 jobs:
   execute-task:
+    # Trigger if manually run OR if the label applied is exactly 'Ready for Dev'
     if: |
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'issues' && contains(github.event.issue.labels.*.name, 'Ready for Dev'))
+      (github.event_name == 'issues' && github.event.label.name == 'Ready for Dev')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,6 +25,32 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Resolve Issue Metadata
+        id: metadata
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT_ISSUE_NUM: ${{ github.event.issue.number }}
+          INPUT_ISSUE_NUM: ${{ inputs.issue_number }}
+        run: |
+          if [ -n "$INPUT_ISSUE_NUM" ]; then
+            ISSUE_NUM="$INPUT_ISSUE_NUM"
+          else
+            ISSUE_NUM="$EVENT_ISSUE_NUM"
+          fi
+          echo "ISSUE_NUM=$ISSUE_NUM" >> $GITHUB_OUTPUT
+
+          # Fetch latest issue title and body via GitHub CLI
+          ISSUE_DATA=$(gh issue view $ISSUE_NUM --json title,body)
+          echo "TITLE=$(echo "$ISSUE_DATA" | jq -r .title)" >> $GITHUB_OUTPUT
+
+      # Transition: Ready for Dev -> In Progress
+      - name: Transition Issue to In Progress
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUM: ${{ steps.metadata.outputs.ISSUE_NUM }}
+        run: |
+          gh issue edit $ISSUE_NUM --remove-label "Ready for Dev" --add-label "In Progress" || true
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,47 +69,46 @@ jobs:
         id: agent
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          ISSUE_TITLE: ${{ github.event.issue.title }}
-          ISSUE_BODY: ${{ github.event.issue.body }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_NUMBER: ${{ steps.metadata.outputs.ISSUE_NUM }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python .github/scripts/dev_agent.py
         continue-on-error: true
 
-      # Handle Circuit Breaker Trigger
-      - name: Handle Circuit Breaker Alert
+      # Transition on Failure / Circuit Breaker: In Progress -> Needs Refinement
+      - name: Handle Circuit Breaker & Alerts
         if: steps.agent.outcome == 'failure'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUM: ${{ github.event.issue.number }}
+          ISSUE_NUM: ${{ steps.metadata.outputs.ISSUE_NUM }}
         run: |
           if [ -f alert_comment.md ]; then
             gh issue comment $ISSUE_NUM --body-file alert_comment.md
           else
-            gh issue comment $ISSUE_NUM --body "❌ Dev Agent encountered an unexpected execution error. Check Action logs."
+            gh issue comment $ISSUE_NUM --body "❌ **Dev Agent Encountered an Error**: The run could not be completed. Check GitHub Action logs for details."
           fi
-          gh issue edit $ISSUE_NUM --remove-label "Ready for Dev" --add-label "agent:Needs Refinement"
+          gh issue edit $ISSUE_NUM --remove-label "In Progress" --add-label "Needs Refinement"
           exit 1
 
-      # Create Pull Request if Successful
+      # Transition on Success: In Progress -> PR Open
       - name: Create Branch & Pull Request
         if: steps.agent.outcome == 'success'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ISSUE_NUM: ${{ github.event.issue.number }}
-          TITLE: ${{ github.event.issue.title }}
+          ISSUE_NUM: ${{ steps.metadata.outputs.ISSUE_NUM }}
+          TITLE: ${{ steps.metadata.outputs.TITLE }}
         run: |
           BRANCH_NAME="agent/issue-${ISSUE_NUM}"
           git checkout -b $BRANCH_NAME
           git add .
           git commit -m "feat: implement issue #${ISSUE_NUM} - ${TITLE}"
-          git push origin $BRANCH_NAME
+          git push origin $BRANCH_NAME --force
 
-          gh pr create \
+          PR_URL=$(gh pr create \
             --title "feat: ${TITLE} (Closes #${ISSUE_NUM})" \
             --body "Automated implementation by Dev Agent for Issue #${ISSUE_NUM}. Includes SwiftUI/SwiftData changes and unit test suite. Please review diff and test in Xcode." \
             --head $BRANCH_NAME \
-            --base main
+            --base main)
 
-          gh issue comment $ISSUE_NUM --body "✅ Pull Request created for this ticket with unit tests included. Ready for human review in Xcode."
-          gh issue edit $ISSUE_NUM --remove-label "Ready for Dev" --add-label "agent:pr-open"
+          gh issue comment $ISSUE_NUM --body "✅ **Implementation Complete**: Pull Request created: $PR_URL with unit tests included. Ready for human review in Xcode."
+          gh issue edit $ISSUE_NUM --remove-label "In Progress" --add-label "PR Open"
