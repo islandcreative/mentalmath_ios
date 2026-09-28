@@ -3,193 +3,299 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Agent Dev Oversight Hub</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>iOS Dev Oversight Hub</title>
   <style>
-    /* Custom scrollbars */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #0f172a; }
-    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #0b0f19;
+      color: #f1f5f9;
+      padding: 24px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #1e293b;
+      margin-bottom: 24px;
+    }
+    .title-group h1 { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .title-group p { font-size: 0.85rem; color: #94a3b8; font-family: monospace; }
+    .btn-group { display: flex; gap: 10px; }
+    button {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.8rem;
+      padding: 8px 14px;
+      border-radius: 8px;
+      border: none;
+      transition: all 0.2s ease;
+    }
+    .btn-primary { background: #38bdf8; color: #0b0f19; }
+    .btn-primary:hover { background: #0ea5e9; }
+    .btn-secondary { background: #1e293b; color: #f1f5f9; border: 1px solid #334155; }
+    .btn-secondary:hover { background: #334155; }
+    
+    /* Banner */
+    #statusBanner {
+      display: none;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 0.85rem;
+    }
+    .banner-error { background: #450a0a; border: 1px solid #991b1b; color: #fca5a5; }
+    .banner-success { background: #064e3b; border: 1px solid #065f46; color: #6ee7b7; }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .stat-card {
+      background: #111827;
+      border: 1px solid #1f2937;
+      padding: 16px;
+      border-radius: 10px;
+    }
+    .stat-label { font-size: 0.75rem; text-transform: uppercase; color: #9ca3af; font-weight: 600; }
+    .stat-val { font-size: 1.5rem; font-weight: 700; margin-top: 4px; color: #f9fafb; }
+
+    /* Kanban Board */
+    .kanban-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
+    .column {
+      background: #111827;
+      border: 1px solid #1f2937;
+      border-radius: 10px;
+      padding: 16px;
+      min-height: 450px;
+    }
+    .col-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #1f2937;
+      margin-bottom: 12px;
+    }
+    .col-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; }
+    .badge {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 12px;
+      background: #1f2937;
+      color: #94a3b8;
+    }
+    .card-list { display: flex; flex-direction: column; gap: 12px; }
+    .issue-card {
+      background: #1a2234;
+      border: 1px solid #2d3748;
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .issue-card h4 { font-size: 0.85rem; color: #fff; font-weight: 500; line-height: 1.4; }
+    .card-meta {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.75rem;
+      border-top: 1px solid #2d3748;
+      padding-top: 8px;
+      margin-top: 4px;
+    }
+    .card-meta a { color: #38bdf8; text-decoration: none; }
+    .card-meta a:hover { text-decoration: underline; }
+    .btn-start-dev {
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid #b45309;
+      color: #fbbf24;
+      padding: 3px 8px;
+      font-size: 0.7rem;
+    }
+
+    /* Native Modal Dialog */
+    dialog {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      color: #fff;
+      margin: auto;
+      max-width: 440px;
+      width: 90%;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+    }
+    dialog::backdrop { background: rgba(0, 0, 0, 0.75); }
+    .modal-field { margin-bottom: 16px; }
+    .modal-field label { display: block; font-size: 0.75rem; font-weight: 600; color: #cbd5e1; margin-bottom: 6px; text-transform: uppercase; }
+    .modal-field input {
+      width: 100%;
+      background: #020617;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 10px;
+      color: #fff;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .modal-field input:focus { border-color: #38bdf8; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
   </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans flex flex-col">
+<body>
 
-  <!-- Top Navigation Bar -->
-  <header class="bg-slate-900/80 backdrop-blur border-b border-slate-800 px-6 py-4 sticky top-0 z-20 flex justify-between items-center">
-    <div class="flex items-center gap-3">
-      <span class="text-2xl">🤖</span>
-      <div>
-        <h1 class="text-base font-bold text-white leading-tight">iOS Dev Team Oversight Hub</h1>
-        <p id="repoLabel" class="text-xs text-slate-400 font-mono">Not Connected</p>
-      </div>
+  <header>
+    <div class="title-group">
+      <h1>🤖 Autonomous iOS Dev Oversight</h1>
+      <p id="repoLabel">Repository: Not Connected</p>
     </div>
-    
-    <div class="flex items-center gap-3">
-      <button onclick="refreshData()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition">
-        <span>🔄</span> Refresh
-      </button>
-      <button onclick="openConfigModal()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 font-semibold text-xs px-3.5 py-1.5 rounded-lg transition flex items-center gap-1.5">
-        <span>⚙️</span> Settings / PAT
-      </button>
+    <div class="btn-group">
+      <button id="btnRefresh" class="btn-secondary">🔄 Refresh</button>
+      <button id="btnOpenSettings" class="btn-primary">⚙️ Settings / PAT</button>
     </div>
   </header>
 
-  <!-- Error / Status Notice Banner -->
-  <div id="statusBanner" class="hidden px-6 py-2.5 text-xs font-medium border-b flex justify-between items-center">
-    <span id="statusMessage"></span>
-    <button onclick="dismissBanner()" class="text-slate-400 hover:text-white">&times;</button>
-  </div>
+  <div id="statusBanner"></div>
 
-  <div class="flex-1 p-6 max-w-7xl w-full mx-auto flex flex-col gap-6">
-
-    <!-- KPI Metric Cards -->
-    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-sm">
-        <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Backlog</span>
-        <div id="statBacklog" class="text-2xl font-bold mt-1 text-slate-200">0</div>
-      </div>
-      <div class="bg-slate-900 border border-amber-900/40 p-4 rounded-xl shadow-sm">
-        <span class="text-[11px] font-semibold text-amber-400 uppercase tracking-wider">Ready for Dev</span>
-        <div id="statReady" class="text-2xl font-bold mt-1 text-amber-300">0</div>
-      </div>
-      <div class="bg-slate-900 border border-sky-900/40 p-4 rounded-xl shadow-sm">
-        <span class="text-[11px] font-semibold text-sky-400 uppercase tracking-wider">PR Open (Review)</span>
-        <div id="statReview" class="text-2xl font-bold mt-1 text-sky-300">0</div>
-      </div>
-      <div class="bg-slate-900 border border-rose-900/40 p-4 rounded-xl shadow-sm">
-        <span class="text-[11px] font-semibold text-rose-400 uppercase tracking-wider">Needs Refinement</span>
-        <div id="statAlerts" class="text-2xl font-bold mt-1 text-rose-400">0</div>
-      </div>
-    </section>
-
-    <!-- Kanban Grid -->
-    <main class="grid grid-cols-1 md:grid-cols-4 gap-4 flex-1 items-start">
-      <!-- 1. Backlog -->
-      <div class="bg-slate-900/60 rounded-xl border border-slate-800 flex flex-col p-4 min-h-[500px]">
-        <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-slate-500"></span> Backlog
-          </h2>
-          <span id="countBacklog" class="text-xs font-mono text-slate-400 bg-slate-800 px-2 py-0.5 rounded-full">0</span>
-        </div>
-        <div id="colBacklog" class="flex flex-col gap-3 flex-1 overflow-y-auto"></div>
-      </div>
-
-      <!-- 2. Ready for Dev -->
-      <div class="bg-slate-900/60 rounded-xl border border-amber-950/60 flex flex-col p-4 min-h-[500px]">
-        <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-          <h2 class="text-xs font-bold uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-amber-400"></span> Ready for Dev
-          </h2>
-          <span id="countReady" class="text-xs font-mono text-amber-400 bg-amber-950/40 px-2 py-0.5 rounded-full border border-amber-900/40">0</span>
-        </div>
-        <div id="colReady" class="flex flex-col gap-3 flex-1 overflow-y-auto"></div>
-      </div>
-
-      <!-- 3. PR Open -->
-      <div class="bg-slate-900/60 rounded-xl border border-sky-950/60 flex flex-col p-4 min-h-[500px]">
-        <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-          <h2 class="text-xs font-bold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-sky-400"></span> PR Open
-          </h2>
-          <span id="countReview" class="text-xs font-mono text-sky-400 bg-sky-950/40 px-2 py-0.5 rounded-full border border-sky-900/40">0</span>
-        </div>
-        <div id="colReview" class="flex flex-col gap-3 flex-1 overflow-y-auto"></div>
-      </div>
-
-      <!-- 4. Alerts / Needs Refinement -->
-      <div class="bg-slate-900/60 rounded-xl border border-rose-950/60 flex flex-col p-4 min-h-[500px]">
-        <div class="flex justify-between items-center pb-3 border-b border-slate-800 mb-3">
-          <h2 class="text-xs font-bold uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
-            <span class="w-2 h-2 rounded-full bg-rose-400"></span> Needs Refinement
-          </h2>
-          <span id="countAlerts" class="text-xs font-mono text-rose-400 bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-900/40">0</span>
-        </div>
-        <div id="colAlerts" class="flex flex-col gap-3 flex-1 overflow-y-auto"></div>
-      </div>
-    </main>
-  </div>
-
-  <!-- Settings / PAT Modal -->
-  <div id="configModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl">
-      <div class="flex justify-between items-center mb-4">
-        <h3 class="text-lg font-bold text-white">Dashboard Settings</h3>
-        <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white">&times;</button>
-      </div>
-
-      <div class="flex flex-col gap-4">
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">GitHub Personal Access Token (PAT)</label>
-          <input id="inputToken" type="password" placeholder="github_pat_..." class="w-full bg-slate-950 border border-slate-700 text-sm px-3.5 py-2.5 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500">
-          <p class="text-[11px] text-slate-400 mt-1">Requires <code>Issues: Read & Write</code> and <code>Pull requests: Read-only</code>.</p>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-300 uppercase mb-1">Repository (owner/repo)</label>
-          <input id="inputRepo" type="text" placeholder="example: yourusername/my-ios-app" class="w-full bg-slate-950 border border-slate-700 text-sm px-3.5 py-2.5 rounded-lg text-slate-200 focus:outline-none focus:border-sky-500">
-        </div>
-
-        <div class="pt-2 flex justify-end gap-2">
-          <button onclick="closeConfigModal()" class="px-4 py-2 rounded-lg text-xs font-semibold text-slate-400 hover:text-white">Cancel</button>
-          <button onclick="saveConfig()" class="bg-sky-500 hover:bg-sky-400 text-slate-950 px-4 py-2 rounded-lg text-xs font-bold transition">Save & Connect</button>
-        </div>
-      </div>
+  <!-- KPI Counters -->
+  <section class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Backlog</div>
+      <div class="stat-val" id="statBacklog">0</div>
     </div>
-  </div>
+    <div class="stat-card">
+      <div class="stat-label" style="color: #fbbf24;">Ready for Dev</div>
+      <div class="stat-val" id="statReady" style="color: #fbbf24;">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" style="color: #38bdf8;">PR Open (Review)</div>
+      <div class="stat-val" id="statReview" style="color: #38bdf8;">0</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label" style="color: #f87171;">Needs Refinement</div>
+      <div class="stat-val" id="statAlerts" style="color: #f87171;">0</div>
+    </div>
+  </section>
+
+  <!-- Board Columns -->
+  <main class="kanban-grid">
+    <div class="column">
+      <div class="col-header">
+        <span class="col-title">Backlog</span>
+        <span class="badge" id="countBacklog">0</span>
+      </div>
+      <div class="card-list" id="colBacklog"></div>
+    </div>
+
+    <div class="column" style="border-color: #78350f;">
+      <div class="col-header">
+        <span class="col-title" style="color: #fbbf24;">Ready for Dev</span>
+        <span class="badge" id="countReady" style="color: #fbbf24;">0</span>
+      </div>
+      <div class="card-list" id="colReady"></div>
+    </div>
+
+    <div class="column" style="border-color: #0369a1;">
+      <div class="col-header">
+        <span class="col-title" style="color: #38bdf8;">PR Open</span>
+        <span class="badge" id="countReview" style="color: #38bdf8;">0</span>
+      </div>
+      <div class="card-list" id="colReview"></div>
+    </div>
+
+    <div class="column" style="border-color: #991b1b;">
+      <div class="col-header">
+        <span class="col-title" style="color: #f87171;">Alerts / Paused</span>
+        <span class="badge" id="countAlerts" style="color: #f87171;">0</span>
+      </div>
+      <div class="card-list" id="colAlerts"></div>
+    </div>
+  </main>
+
+  <!-- HTML5 Native Modal -->
+  <dialog id="settingsDialog">
+    <h3 style="margin-bottom: 16px; font-size: 1.1rem;">Dashboard Settings</h3>
+    
+    <div class="modal-field">
+      <label>GitHub Personal Access Token (PAT)</label>
+      <input type="password" id="inputToken" placeholder="github_pat_...">
+      <p style="font-size: 0.75rem; color: #94a3b8; margin-top: 4px;">Permissions: <code>Issues: Read & Write</code></p>
+    </div>
+
+    <div class="modal-field">
+      <label>Repository (owner/repo)</label>
+      <input type="text" id="inputRepo" placeholder="your-username/your-repo">
+    </div>
+
+    <div class="modal-actions">
+      <button id="btnCancelSettings" class="btn-secondary">Cancel</button>
+      <button id="btnSaveSettings" class="btn-primary">Save & Connect</button>
+    </div>
+  </dialog>
 
   <script>
-    const STORAGE_KEY_TOKEN = "hub_github_token";
-    const STORAGE_KEY_REPO = "hub_github_repo";
+    // Storage identifiers
+    const KEY_PAT = "hub_gh_token";
+    const KEY_REPO = "hub_gh_repo";
 
-    function showBanner(msg, type = "error") {
-      const banner = document.getElementById("statusBanner");
-      const messageEl = document.getElementById("statusMessage");
-      banner.className = `px-6 py-2.5 text-xs font-medium border-b flex justify-between items-center ` + 
-        (type === "error" ? "bg-rose-950/80 border-rose-900 text-rose-200" : "bg-emerald-950/80 border-emerald-900 text-emerald-200");
-      messageEl.textContent = msg;
-      banner.classList.remove("hidden");
+    const dialog = document.getElementById("settingsDialog");
+    const inputToken = document.getElementById("inputToken");
+    const inputRepo = document.getElementById("inputRepo");
+    const statusBanner = document.getElementById("statusBanner");
+
+    function showBanner(text, type = "error") {
+      statusBanner.textContent = text;
+      statusBanner.className = type === "error" ? "banner-error" : "banner-success";
+      statusBanner.style.display = "block";
     }
 
-    function dismissBanner() {
-      document.getElementById("statusBanner").classList.add("hidden");
+    function hideBanner() {
+      statusBanner.style.display = "none";
     }
 
-    function openConfigModal() {
-      document.getElementById("inputToken").value = localStorage.getItem(STORAGE_KEY_TOKEN) || "";
-      document.getElementById("inputRepo").value = localStorage.getItem(STORAGE_KEY_REPO) || "";
-      document.getElementById("configModal").classList.remove("hidden");
+    function openModal() {
+      inputToken.value = localStorage.getItem(KEY_PAT) || "";
+      inputRepo.value = localStorage.getItem(KEY_REPO) || "";
+      dialog.showModal();
     }
 
-    function closeConfigModal() {
-      document.getElementById("configModal").classList.add("hidden");
-    }
+    // Attach listeners cleanly
+    document.getElementById("btnOpenSettings").addEventListener("click", openModal);
+    document.getElementById("btnCancelSettings").addEventListener("click", () => dialog.close());
+    document.getElementById("btnRefresh").addEventListener("click", loadDashboard);
 
-    function saveConfig() {
-      const token = document.getElementById("inputToken").value.trim();
-      const repo = document.getElementById("inputRepo").value.trim();
+    document.getElementById("btnSaveSettings").addEventListener("click", () => {
+      const token = inputToken.value.trim();
+      const repo = inputRepo.value.trim();
 
       if (!token || !repo) {
-        alert("Please enter both your PAT and repo path (owner/repo).");
+        alert("Please enter both the PAT and owner/repo path.");
         return;
       }
 
-      localStorage.setItem(STORAGE_KEY_TOKEN, token);
-      localStorage.setItem(STORAGE_KEY_REPO, repo);
-      closeConfigModal();
-      refreshData();
-    }
+      localStorage.setItem(KEY_PAT, token);
+      localStorage.setItem(KEY_REPO, repo);
+      dialog.close();
+      loadDashboard();
+    });
 
-    async function apiRequest(endpoint, options = {}) {
-      const token = localStorage.getItem(STORAGE_KEY_TOKEN);
-      const repo = localStorage.getItem(STORAGE_KEY_REPO);
-
-      if (!token || !repo) {
-        throw new Error("GitHub PAT or Repository not configured. Click 'Settings / PAT' above.");
-      }
+    async function ghFetch(endpoint, options = {}) {
+      const token = localStorage.getItem(KEY_PAT);
+      const repo = localStorage.getItem(KEY_REPO);
 
       const headers = {
-        "Accept": "application/vnd.github.v3+json",
+        "Accept": "application/vnd.github+json",
         "Authorization": `Bearer ${token}`
       };
 
@@ -199,47 +305,47 @@
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || `GitHub API returned HTTP ${res.status}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.message || `API error (${res.status})`);
       }
 
       return res.json();
     }
 
-    async function promoteToDev(issueNumber) {
+    window.promoteToDev = async function(issueNum) {
       try {
-        await apiRequest(`/issues/${issueNumber}/labels`, {
+        await ghFetch(`/issues/${issueNum}/labels`, {
           method: "POST",
           body: JSON.stringify({ labels: ["ready-for-dev"] })
         });
-        showBanner(`Promoted #${issueNumber} to 'ready-for-dev'! Dev Agent will trigger shortly.`, "success");
-        refreshData();
+        showBanner(`Promoted #${issueNum} to 'ready-for-dev'! Dev Agent workflow triggered.`, "success");
+        loadDashboard();
       } catch (err) {
-        showBanner(`Failed to update issue: ${err.message}`, "error");
+        showBanner(`Failed to promote issue: ${err.message}`, "error");
       }
-    }
+    };
 
-    async function refreshData() {
-      dismissBanner();
-      const repo = localStorage.getItem(STORAGE_KEY_REPO);
-      const token = localStorage.getItem(STORAGE_KEY_TOKEN);
+    async function loadDashboard() {
+      hideBanner();
+      const token = localStorage.getItem(KEY_PAT);
+      const repo = localStorage.getItem(KEY_REPO);
 
-      if (!repo || !token) {
-        openConfigModal();
+      if (!token || !repo) {
+        openModal();
         return;
       }
 
-      document.getElementById("repoLabel").textContent = repo;
+      document.getElementById("repoLabel").textContent = `Repository: ${repo}`;
 
       try {
-        const issues = await apiRequest(`/issues?state=open&per_page=100`);
-        renderColumns(issues);
+        const issues = await ghFetch(`/issues?state=open&per_page=100`);
+        render(issues);
       } catch (err) {
-        showBanner(err.message, "error");
+        showBanner(`Connection Error: ${err.message}. Check your PAT and repo name.`, "error");
       }
     }
 
-    function renderColumns(items) {
+    function render(items) {
       ["colBacklog", "colReady", "colReview", "colAlerts"].forEach(id => {
         document.getElementById(id).innerHTML = "";
       });
@@ -247,52 +353,43 @@
       let stats = { backlog: 0, ready: 0, review: 0, alerts: 0 };
 
       items.forEach(issue => {
-        // Skip actual PR items that GitHub returns in /issues
-        if (issue.pull_request) return;
+        if (issue.pull_request) return; // Skip PR objects
 
-        const labels = issue.labels.map(l => l.name);
-        let col = "colBacklog";
+        const labels = (issue.labels || []).map(l => l.name);
+        let colId = "colBacklog";
         let isBacklog = false;
 
         if (labels.includes("agent:needs-refinement")) {
-          col = "colAlerts";
+          colId = "colAlerts";
           stats.alerts++;
         } else if (labels.includes("agent:pr-open")) {
-          col = "colReview";
+          colId = "colReview";
           stats.review++;
         } else if (labels.includes("ready-for-dev")) {
-          col = "colReady";
+          colId = "colReady";
           stats.ready++;
         } else {
-          col = "colBacklog";
+          colId = "colBacklog";
           isBacklog = true;
           stats.backlog++;
         }
 
-        const sizeLabel = labels.find(l => l.toLowerCase().includes("small") || l.toLowerCase().includes("medium")) || "Task";
-
         const card = document.createElement("div");
-        card.className = "bg-slate-900 border border-slate-800 p-3.5 rounded-lg shadow-sm hover:border-slate-700 transition flex flex-col gap-2";
+        card.className = "issue-card";
         card.innerHTML = `
-          <div class="flex justify-between items-center">
-            <span class="text-[11px] font-mono text-slate-400">#${issue.number}</span>
-            <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300">${sizeLabel}</span>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <span style="font-family:monospace; color:#94a3b8; font-size:0.75rem;">#${issue.number}</span>
           </div>
-          <h4 class="text-xs font-semibold text-slate-100 leading-snug line-clamp-2">${issue.title}</h4>
-          <div class="flex justify-between items-center pt-2 border-t border-slate-800/80 text-[11px]">
-            <a href="${issue.html_url}" target="_blank" class="text-sky-400 hover:underline">Open Issue &rarr;</a>
-            ${isBacklog ? `
-              <button onclick="promoteToDev(${issue.number})" class="bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-900/60 px-2 py-0.5 rounded text-[10px] font-medium transition">
-                Start Dev 🚀
-              </button>
-            ` : ""}
+          <h4>${issue.title}</h4>
+          <div class="card-meta">
+            <a href="${issue.html_url}" target="_blank">Open Issue &rarr;</a>
+            ${isBacklog ? `<button class="btn-start-dev" onclick="window.promoteToDev(${issue.number})">Start Dev 🚀</button>` : ""}
           </div>
         `;
 
-        document.getElementById(col).appendChild(card);
+        document.getElementById(colId).appendChild(card);
       });
 
-      // Update counter UI
       document.getElementById("statBacklog").textContent = stats.backlog;
       document.getElementById("statReady").textContent = stats.ready;
       document.getElementById("statReview").textContent = stats.review;
@@ -304,12 +401,12 @@
       document.getElementById("countAlerts").textContent = stats.alerts;
     }
 
-    // Auto load on start
+    // Auto-check on boot
     window.addEventListener("DOMContentLoaded", () => {
-      if (localStorage.getItem(STORAGE_KEY_TOKEN) && localStorage.getItem(STORAGE_KEY_REPO)) {
-        refreshData();
+      if (localStorage.getItem(KEY_PAT) && localStorage.getItem(KEY_REPO)) {
+        loadDashboard();
       } else {
-        openConfigModal();
+        openModal();
       }
     });
   </script>
